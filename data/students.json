@@ -1,0 +1,28 @@
+[
+  {
+    "codigo": "EST001",
+    "nombre": "María Fernanda López García",
+    "email": "maria.lopez@universidad.edu.co",
+    "fecha_nacimiento": "2003-05-15",
+    "programa": { "id": "TO_BE_REPLACED", "nombre": "Ingeniería de Software" },
+    "semestre_actual": 5,
+    "promedio_acumulado": 4.2,
+    "creditos_cursados": 85,
+    "estado": "Activo",
+    "materias_cursadas": [],
+    "contacto": { "telefono": "+57 300 123 4567", "direccion": "Calle 45 #23-10, Medellín", "ciudad": "Medellín" }
+  },
+  {
+    "codigo": "EST002",
+    "nombre": "Juan Pablo Gómez Restrepo",
+    "email": "juan.gomez@universidad.edu.co",
+    "fecha_nacimiento": "2002-08-22",
+    "programa": { "id": "TO_BE_REPLACED", "nombre": "Medicina" },
+    "semestre_actual": 6,
+    "promedio_acumulado": 3.8,
+    "creditos_cursados": 90,
+    "estado": "Activo",
+    "materias_cursadas": [],
+    "contacto": { "telefono": "+57 301 234 5678", "direccion": "Carrera 50 #12-30, Bogotá", "ciudad": "Bogotá" }
+  }
+]

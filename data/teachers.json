@@ -1,0 +1,16 @@
+[
+  {
+    "codigo": "PROF001",
+    "nombre": "Dr. Juan Pérez",
+    "email": "juan.perez@uni.edu",
+    "especialidades": ["Matemáticas"],
+    "materias_asignadas": []
+  },
+  {
+    "codigo": "PROF002",
+    "nombre": "Dra. María López",
+    "email": "maria.lopez@uni.edu",
+    "especialidades": ["Física"],
+    "materias_asignadas": []
+  }
+]
