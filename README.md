@@ -1,235 +1,347 @@
-Sistema Académico MongoDB
+# 🎓 Sistema Académico MongoDB
 
-Descripción General
+## 📋 Descripción General
 
-El proyecto SistemaAcademicoMongoDB implementa una base de datos NoSQL en MongoDB para gestionar información académica de una universidad. Incluye colecciones para programas, materias, profesores, estudiantes e inscripciones, con esquemas de validación, datos de prueba, operaciones CRUD, transacciones, agregaciones y monitoreo de cambios mediante Change Streams. El objetivo es proporcionar una solución robusta para administrar registros académicos, garantizando integridad de datos y escalabilidad.
+El **Sistema Académico MongoDB** es una solución integral de base de datos NoSQL diseñada para gestionar información académica universitaria con énfasis en **integridad de datos** y **análisis en tiempo real**. El sistema implementa un modelo de datos basado en referencias de tipo `string` (códigos como `E001`, `BBDD-002`) en lugar de `ObjectId`, facilitando la trazabilidad y las consultas.
 
-Objetivos
+### 🎯 Enfoque del Sistema
 
+Este proyecto demuestra las capacidades avanzadas de MongoDB para aplicaciones empresariales:
 
+- **Integridad de Datos**: Validaciones de esquema (`$jsonSchema`) y lógica de negocio (funciones JavaScript)
+- **Atomicidad**: Transacciones multi-documento para operaciones críticas
+- **Análisis Avanzado**: Pipelines de agregación para reportes en tiempo real
+- **Reactividad**: Change Streams para triggers asíncronos y auditoría
 
+### 🏗️ Colecciones Principales
 
+- **`estudiantes`**: Información de estudiantes con validación de email institucional (`@unal.edu.co`)
+- **`materias`**: Catálogo de materias con prerrequisitos y créditos
+- **`profesores`**: Registro de profesores y materias asignadas
+- **`inscripciones`**: Relación estudiante-materia con calificaciones y estados
 
-Gestión de datos académicos: Almacenar y consultar información sobre programas, materias, profesores, estudiantes e inscripciones.
+## 🎯 Objetivos del Proyecto
 
+1. ✅ **Gestión de datos académicos**: Almacenar y consultar información sobre materias, profesores, estudiantes e inscripciones
+2. 🔒 **Validación de datos**: Asegurar consistencia mediante esquemas de validación y verificaciones personalizadas
+3. ⚡ **Operaciones avanzadas**: Implementar transacciones ACID, consultas complejas y reportes analíticos
+4. 🔄 **Monitoreo en tiempo real**: Usar Change Streams para reaccionar a cambios en la base de datos
+5. 📊 **Análisis de rendimiento**: Generar reportes de estudiantes en riesgo, tasas de reprobación y rankings
 
+## 📁 Estructura del Proyecto
 
-Validación de datos: Asegurar consistencia mediante esquemas de validación y verificaciones personalizadas.
+```
+sistema-academico-mongodb/
+|___docs/  # Manual de uso y justificaciones
+├── scripts/
+│   ├── 01-insert-date.js          # 📥 Datos iniciales (20+ docs por colección)
+│   ├── 02-create-collection.js    # 🏗️ Creación de colecciones con $jsonSchema
+│   ├── 03-Validations.js          # ✔️ Funciones de validación de negocio
+│   ├── 04-CRUD-Functions.js       # 📝 Operaciones CRUD para todas las colecciones
+│   ├── 05-Transactions.js         # 🔐 Transacciones multi-documento
+│   ├── 06-Agregations.js          # 📊 Pipelines de agregación y reportes
+│   └── 07-Change-Streams.js       # 🔔 Listeners de eventos en tiempo real
+├── README.md                       # 📖 Documentación general (este archivo)
+└── manual-de-uso.md               # 📚 Guía detallada de uso
+```
 
+## 🔑 Componentes Funcionales
 
+### A. 🛡️ Integridad de Datos (Validaciones)
 
-Operaciones avanzadas: Implementar consultas, actualizaciones, transacciones y reportes analíticos.
+#### 1. Validaciones de Esquema (`$jsonSchema`)
 
+Implementadas en `02-create-collection.js`:
 
+- **Email institucional**: Pattern regex `@unal\.edu\.co$`
+- **Rangos de notas**: `calificacion_final` entre `0.0` y `5.0`
+- **Estados enumerados**: `estado` con valores `['Activo', 'Inactivo', 'Retirado', 'Graduado']`
+- **Créditos y semestres**: Validación de rangos numéricos
 
-Monitoreo en tiempo real: Usar Change Streams para reaccionar a cambios en la base de datos.
+#### 2. Validaciones de Lógica de Negocio
 
-Estructura del Proyecto
+Implementadas en `03-Validations.js`:
 
+- **`esCodigoUnico(coleccion, codigo)`**: Verifica unicidad de códigos
+- **`esEmailInstitucionalValidoYUnico(email, coleccion)`**: Valida formato y unicidad de emails
+- **`verificarPrerrequisitos(codigoMateria, codigoEstudiante)`**: ⚠️ **Función crítica** que verifica si el estudiante tiene la materia prerrequisito con `estado_materia: "Aprobada"`
+- **`validarInscripcionUnica(codigoEstudiante, codigoMateria, periodo)`**: Previene inscripciones duplicadas
 
+### B. ⚛️ Atomicidad (Transacciones Multi-Documento)
 
+Implementadas en `05-Transactions.js` usando la API de Transacciones de MongoDB:
 
+#### 1. **Inscripción Múltiple** (`inscripcionMultipleMaterias_VALIDADA`)
 
-scripts/: Scripts JavaScript ejecutables en MongoDB shell o Compass.
+```javascript
+inscripcionMultipleMaterias_VALIDADA("E001", "2025-1", ["MAT005", "FIS001", "IND-303"]);
+```
 
+- Inscribe en N materias verificando prerrequisitos
+- **Todo o nada**: Si falla una materia, se revierten todas las inscripciones
+- Garantiza consistencia en inscripciones masivas
 
+#### 2. **Registro de Nota Crítica** (`registrarNotaYActualizarPromedio`)
 
+```javascript
+registrarNotaYActualizarPromedio("E002", "ALG-001", 3.5, "2024-2");
+```
 
+- Registra `calificacion_final` **Y** actualiza `promedio_acumulado` **Y** actualiza `creditos_cursados`
+- Recalcula el promedio ponderado considerando todas las materias finalizadas
+- Operación atómica que previene inconsistencias
 
-01-crear-colecciones.js: Crea las colecciones con esquemas de validación.
+#### 3. **Retiro de Materia** (`retirarMateria`)
 
+Cambia el estado a "Retirada" manteniendo la integridad del historial.
 
+#### 4. **Graduación de Estudiante** (`graduarEstudiante`)
 
-02-insertar-datos.js: Inserta al menos 20 documentos por colección.
+Valida requisitos de créditos (160 mínimo) antes de cambiar el estado a "Graduado".
 
+### C. 📊 Análisis y Reportes (Agregación)
 
+Implementadas en `06-Agregations.js` usando el *Aggregation Framework*:
 
-03-validaciones.js: Verifica unicidad, correos y prerrequisitos.
+#### 1. **Estudiantes en Riesgo** (`listarEstudiantesEnRiesgo`)
 
+```javascript
+listarEstudiantesEnRiesgo().forEach(printjson);
+```
 
+Lista estudiantes activos con `promedio_acumulado < 3.0`.
 
-04-crud-funciones.js: Funciones CRUD para todas las colecciones.
+#### 2. **Tasa de Reprobación** (`reporteMateriasMasReprobadas`)
 
+```javascript
+reporteMateriasMasReprobadas().forEach(printjson);
+```
 
+Calcula el porcentaje de reprobación por materia usando `$group` y `$cond`.
 
-05-transacciones.js: Transacciones para operaciones atómicas.
+#### 3. **Ranking TOP 5** (`rankingMejoresEstudiantes`)
 
+```javascript
+rankingMejoresEstudiantes().forEach(printjson);
+```
 
+Genera un ranking de los 5 mejores estudiantes por programa usando `$group` y `$slice`.
 
-06-agregaciones.js: Reportes analíticos con pipelines de agregación.
+#### 4. **Promedio por Materia** (`calcularPromedioPorMateria`)
 
+Calcula el promedio de calificaciones finales con `$lookup` para traer nombres de materias.
 
+#### 5. **Carga Académica** (`calcularCargaAcademica`)
 
-07-change-streams.js: Monitoreo de cambios en inscripciones.
+Analiza el número de materias asignadas a cada profesor en un período.
 
+#### 6. **Análisis de Deserción** (`analisisDesercion`)
 
+Reporta estudiantes en estado "Retirado" o "Inactivo" por programa.
 
-data/: Archivos JSON con datos de prueba para importación manual.
+### D. 🔔 Reactividad (Change Streams)
 
+Implementadas en `07-Change-Streams.js` para triggers asíncronos:
 
+#### 1. **Actualización Automática de Créditos** (`streamActualizarCreditos`)
 
+```javascript
+streamActualizarCreditos();
+```
 
+- Reacciona a inscripciones con `estado_materia: "Aprobada"`
+- Incrementa automáticamente `creditos_cursados` usando `$inc`
+- Mantiene sincronización en tiempo real
 
-estudiantes.json, profesores.json, materias.json, programas.json, inscripciones.json.
+#### 2. **Notificación de Riesgo** (`streamNotificacionRiesgo`)
 
+```javascript
+streamNotificacionRiesgo();
+```
 
+- Alerta cuando `promedio_acumulado` cae por debajo de `3.0`
+- Útil para sistemas de alerta temprana
 
-docs/: Documentación del proyecto.
+#### 3. **Auditoría** (`streamAuditoriaEstudiantes`)
 
+```javascript
+streamAuditoriaEstudiantes();
+```
 
+- Registra todos los `UPDATE` y `REPLACE` en `db.estudiantes`
+- Guarda cambios en colección `auditoria_estudiantes`
 
+#### 4. **Validación de Cupos** (`streamValidacionCupos`)
 
+Monitorea inscripciones para alertar sobre sobrecupos.
 
-justificaciones.md: Explicación del diseño y validaciones.
+#### 5. **Historial de Calificaciones** (`streamHistorialCalificaciones`)
 
+Crea un registro histórico de modificaciones de notas.
 
+## 🆚 Comparación con SQL
 
-manual-de-uso.md: Guía detallada para usar los scripts.
+| **Concepto SQL** | **Equivalente MongoDB** | **Implementación** |
+|------------------|-------------------------|---------------------|
+| `FOREIGN KEY` | Referencias por código `string` | `estudiante_codigo`, `materia_codigo` |
+| `CHECK CONSTRAINT` | `$jsonSchema` validator | `pattern`, `enum`, `minimum`, `maximum` |
+| `TRIGGER` | Change Streams | `db.collection.watch()` |
+| `TRANSACTION` | Multi-document Transactions | `session.startTransaction()` |
+| `JOIN` | `$lookup` en aggregation | Pipeline con `$lookup` + `$unwind` |
+| `GROUP BY` | `$group` | Aggregation pipeline |
+| `HAVING` | `$match` después de `$group` | Pipeline stages |
+| `STORED PROCEDURE` | Funciones JavaScript | Funciones en scripts |
 
+## ⚙️ Requisitos
 
+- **MongoDB**: Versión 4.0+ con **Replica Set** (obligatorio para transacciones y Change Streams)
+- **MongoDB Compass**: Versión 1.47.0+ (opcional, para ejecución gráfica)
+- **Mongo Shell** (`mongosh` o `mongo`): Para ejecución en terminal
+- **Editor de texto**: Visual Studio Code, Notepad++, etc.
+- **Sistema operativo**: Windows, macOS o Linux
 
-esquema-diagrama.png: Diagrama ER del modelo de datos (generar con Draw.io).
+## 🚀 Instalación y Configuración
 
-Requisitos
+### 1. Configurar MongoDB con Replica Set
 
+⚠️ **IMPORTANTE**: Las transacciones y Change Streams requieren un Replica Set.
 
+```bash
+# Iniciar MongoDB con replica set
+mongod --replSet rs0 --port 27017 --dbpath /data/db
 
-
-
-MongoDB: Versión 4.0+ con clúster de réplica para transacciones y Change Streams.
-
-
-
-MongoDB Compass: Versión 1.47.0 (opcional, para ejecución gráfica).
-
-
-
-Mongo Shell: Para ejecución en terminal.
-
-
-
-Editor de texto: Visual Studio Code o Notepad++ (guardar scripts en UTF-8 sin BOM).
-
-
-
-Sistema operativo: Windows, macOS o Linux.
-
-Instalación
-
-
-
-
-
-Crea el directorio SistemaAcademicoMongoDB:
-
-mkdir SistemaAcademicoMongoDB
-cd SistemaAcademicoMongoDB
-mkdir scripts data docs
-
-
-
-Guarda los scripts en scripts/, los archivos JSON en data/, y los documentos Markdown en docs/.
-
-
-
-Asegúrate de que MongoDB esté corriendo:
-
-mongod --replSet rs0
-
-Inicia la réplica (si es necesario):
-
+# En otra terminal, conectar y inicializar el replica set
+mongosh
 rs.initiate()
+```
 
+### 2. Clonar o Descargar el Proyecto
 
+```bash
+git clone <repository-url>
+cd sistema-academico-mongodb
+```
 
-Verifica que los archivos estén en UTF-8 sin BOM usando un editor como Notepad++ (Codificación > Convertir a UTF-8 sin BOM).
+### 3. Verificar la Estructura
 
-Ejecución
+Asegúrate de que todos los scripts estén en la carpeta `scripts/`.
 
+## 🎬 Ejecución
 
+### Orden de Carga de Scripts
 
+**Ejecuta los scripts en el siguiente orden**:
 
+```bash
+# 1. Crear colecciones con validaciones
+mongosh universidad < scripts/02-create-collection.js
 
-Ejecuta los scripts en orden desde la terminal:
+# 2. Insertar datos iniciales
+mongosh universidad < scripts/01-insert-date.js
 
-mongo < SistemaAcademicoMongoDB/scripts/01-crear-colecciones.js
-mongo < SistemaAcademicoMongoDB/scripts/02-insertar-datos.js
-mongo < SistemaAcademicoMongoDB/scripts/03-validaciones.js
-mongo < SistemaAcademicoMongoDB/scripts/04-crud-funciones.js
-mongo < SistemaAcademicoMongoDB/scripts/05-transacciones.js
-mongo < SistemaAcademicoMongoDB/scripts/06-agregaciones.js
-mongo < SistemaAcademicoMongoDB/scripts/07-change-streams.js
+# 3. Cargar funciones de validación
+mongosh universidad < scripts/03-Validations.js
 
+# 4. Cargar funciones CRUD
+mongosh universidad < scripts/04-CRUD-Functions.js
 
+# 5. Cargar funciones de transacciones
+mongosh universidad < scripts/05-Transactions.js
 
-Alternativamente, en MongoDB Compass:
+# 6. Cargar funciones de agregación
+mongosh universidad < scripts/06-Agregations.js
 
+# 7. Activar Change Streams (en proceso separado)
+mongosh universidad < scripts/07-Change-Streams.js
+```
 
+### Ejecución en MongoDB Compass
 
+1. Conectar a `mongodb://localhost:27017`
+2. Seleccionar la base de datos `universidad`
+3. Abrir el shell (pestaña "Mongosh")
+4. Copiar y pegar el contenido de cada script en orden
 
+## ✅ Verificación
 
-Abre el shell (pestaña "Shell" o mongosh).
+### Confirmar Colecciones
 
+```javascript
+use universidad
+db.getCollectionNames()
+// Resultado esperado: ["estudiantes", "inscripciones", "materias", "profesores"]
+```
 
+### Verificar Documentos
 
-Copia y pega el contenido de cada script en orden.
+```javascript
+db.materias.countDocuments();       // 20
+db.profesores.countDocuments();     // 20
+db.estudiantes.countDocuments();    // 20
+db.inscripciones.countDocuments();  // 20+
+```
 
+### Probar Funciones
 
+```javascript
+// Listar estudiantes en riesgo
+listarEstudiantesEnRiesgo().forEach(printjson);
 
-(Opcional) Importa datos desde JSON:
+// Ver tasa de reprobación
+reporteMateriasMasReprobadas().forEach(printjson);
 
-mongoimport --db universidad --collection programas --file SistemaAcademicoMongoDB/data/programas.json
-mongoimport --db universidad --collection materias --file SistemaAcademicoMongoDB/data/materias.json
-mongoimport --db universidad --collection profesores --file SistemaAcademicoMongoDB/data/profesores.json
-mongoimport --db universidad --collection estudiantes --file SistemaAcademicoMongoDB/data/estudiantes.json
-mongoimport --db universidad --collection inscripciones --file SistemaAcademicoMongoDB/data/inscripciones.json
+// Ranking de mejores estudiantes
+rankingMejoresEstudiantes().forEach(printjson);
+```
 
-Nota: Reemplaza "TO_BE_REPLACED" en estudiantes.json y inscripciones.json con ObjectId válidos.
+## 📝 Notas Importantes
 
-Verificación
+- ⚠️ **Replica Set Obligatorio**: Las transacciones y Change Streams NO funcionarán sin un replica set configurado
+- 🔒 **Validaciones Estrictas**: Los esquemas están configurados con `validationLevel: "strict"` y `validationAction: "error"`
+- 📧 **Email Institucional**: Solo se aceptan emails con dominio `@unal.edu.co`
+- 🔢 **Códigos String**: El sistema usa códigos de tipo `string` (ej: `E001`, `BBDD-002`) en lugar de `ObjectId` para facilitar la trazabilidad
+- 💾 **Tipo Double**: Los promedios y calificaciones deben usar `Double()` para cumplir con el esquema
 
+## 🔍 Casos de Uso Principales
 
+### 1. Inscripción de Estudiante con Validación de Prerrequisitos
 
+```javascript
+// El estudiante E001 intenta inscribirse en materias avanzadas
+inscripcionMultipleMaterias_VALIDADA("E001", "2025-1", ["BBDD-002", "IND-303"]);
+// ✅ BBDD-002 requiere ALG-001 (ya aprobada)
+// ❌ IND-303 requiere EST-001 (no aprobada) → Transacción abortada
+```
 
+### 2. Registro de Nota con Actualización Automática de Promedio
 
-Confirma que las colecciones existen:
+```javascript
+// Registrar nota final y recalcular promedio
+registrarNotaYActualizarPromedio("E007", "EST-001", 3.5, "2024-2");
+// Actualiza: calificacion_final, estado_materia, promedio_acumulado, creditos_cursados
+```
 
-db.getCollectionNames(); // ["estudiantes", "inscripciones", "materias", "profesores", "programas"]
+### 3. Monitoreo en Tiempo Real de Estudiantes en Riesgo
 
+```javascript
+// Activar listener de riesgo académico
+streamNotificacionRiesgo();
+// Cuando el promedio de un estudiante baja de 3.0, se genera una alerta automática
+```
 
+## 📚 Documentación Adicional
 
-Verifica el número de documentos:
+Para ejemplos detallados de uso, consulta:
+- 📖 **[Manual de Uso](./manual-de-uso.md)**: Guía paso a paso con ejemplos prácticos
 
-db.programas.countDocuments(); // 20
-db.materias.countDocuments();  // 20
-db.profesores.countDocuments(); // 20
-db.estudiantes.countDocuments(); // 20
-db.inscripciones.countDocuments(); // 20
+## 🤝 Contribuciones
 
+Este proyecto fue desarrollado como demostración de capacidades avanzadas de MongoDB. Para sugerencias o mejoras, abre un issue o pull request.
 
+## 📄 Licencia
 
-Revisa las salidas de 06-agregaciones.js y 07-change-streams.js en la consola.
+Este proyecto es de código abierto y está disponible bajo la licencia MIT.
 
-Notas
+---
 
-
-
-
-
-Los scripts están diseñados para evitar errores como MongoBulkWriteError: Document failed validation al cumplir con el esquema de estudiantes (sin programa.codigo).
-
-
-
-Los archivos JSON son ejemplos mínimos; usa 02-insertar-datos.js para datos completos.
-
-
-
-Los Change Streams y transacciones requieren un clúster de réplica.
-
-
-
-Consulta docs/manual-de-uso.md para ejemplos detallados de uso.
-
-Contribuciones
-
-Este proyecto fue desarrollado con Grok, creado por xAI. Para sugerencias o mejoras, contacta al administrador del proyecto.
+**Desarrollado con 💙 para demostrar las capacidades empresariales de MongoDB**
